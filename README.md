@@ -1,0 +1,2 @@
+# CashCollectorBot
+Telegram bot
