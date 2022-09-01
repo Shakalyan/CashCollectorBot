@@ -16,7 +16,6 @@ public class UpdateHandler extends SpringWebhookBot {
     private String botToken;
     private String botPath;
     private MessageHandler messageHandler;
-
     public UpdateHandler(SetWebhook setWebhook, MessageHandler messageHandler) {
         super(setWebhook);
         this.messageHandler = messageHandler;
