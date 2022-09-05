@@ -25,6 +25,6 @@ public class User {
 
     @Column(name="bot_state")
     @NotNull
-    private int botState;
+    private String botState;
 
 }
