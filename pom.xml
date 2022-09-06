@@ -95,7 +95,7 @@
                     <archive>
                         <manifest>
                             <addClasspath>true</addClasspath>
-                            <mainClass>com.package.MainClass</mainClass>
+                            <mainClass>com.example.cashcollectorbot.CashCollectorBotApplication</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>
