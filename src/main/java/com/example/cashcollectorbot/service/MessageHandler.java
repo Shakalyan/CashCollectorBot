@@ -39,6 +39,7 @@ public class MessageHandler {
         handlers.put(BotState.AT_NAME.command, this::getName);
         handlers.put(BotState.AT_SUM.command, this::getSum);
         handlers.put(BotState.AT_DESCRIPTION.command, this::getDescription);
+        handlers.put(BotState.ST_ALL.command, this::showAllTransactions);
     }
 
     public BotApiMethod<?> handle(Update update) {
@@ -64,6 +65,7 @@ public class MessageHandler {
     private List<KeyboardRow> buildStartKeyboard() {
         KeyboardRow addTransactionRow = new KeyboardRow();
         addTransactionRow.add(BotState.AT.command);
+        addTransactionRow.add(BotState.ST_ALL.command);
         List<KeyboardRow> keyboard = new ArrayList<>();
         keyboard.add(addTransactionRow);
         return keyboard;
@@ -179,6 +181,22 @@ public class MessageHandler {
         SendMessage sendMessage = new SendMessage(String.valueOf(update.getMessage().getChatId()), BotState.START.description);
         sendMessage.setReplyMarkup(buildReplyKeyboardMarkup(buildStartKeyboard()));
         return sendMessage;
+    }
+
+    private SendMessage showAllTransactions(Update update, String state) {
+        ArrayList<Transaction> transactions = transactionsRepo.findAllByUserId(update.getMessage().getFrom().getId());
+        StringBuilder text = new StringBuilder();
+
+        for(int i = 0; i < transactions.size(); ++i) {
+            Transaction t = transactions.get(i);
+            text.append(String.format("%d. Сумма: %d₽\nДолжники: %s\nОписание: \"%s\"", i+1,
+                                                                                        t.getSum(),
+                                                                                        t.getBorrowerName(),
+                                                                                        t.getDescription() != null ? t.getDescription() : ""));
+            text.append("\n\n");
+        }
+
+        return new SendMessage(String.valueOf(update.getMessage().getChatId()), text.toString());
     }
 
 }

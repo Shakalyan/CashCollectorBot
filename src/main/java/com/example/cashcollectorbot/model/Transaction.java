@@ -28,4 +28,9 @@ public class Transaction {
     @Column(name="description")
     private String description;
 
+    @Override
+    public String toString() {
+        return String.format("#%d %s %d₽\n%s", id, borrowerName, sum, description != null ? description : "");
+    }
+
 }
