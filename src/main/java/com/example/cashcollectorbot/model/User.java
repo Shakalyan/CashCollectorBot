@@ -27,4 +27,7 @@ public class User {
     @NotNull
     private String botState;
 
+    @Column(name="transaction_id")
+    private Long transactionId;
+
 }

@@ -13,7 +13,9 @@ public enum BotState {
     AT("AT", "Добавить транзакцию", ""),
     AT_NAME("AT_N", "AT_N", "Введите имя заёмщика:"),
     AT_SUM("AT_S", "AT_S","Введите сумму:"),
-    AT_DESCRIPTION("AT_D", "AT_D","Напишите описание к транзакции:");
+    AT_DESCRIPTION("AT_D", "AT_D","Напишите описание к транзакции:"),
+
+    BAD_SUM("", "", "Суммой должно быть натуральное число");
 
     String state;
     String command;

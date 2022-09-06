@@ -1,6 +1,8 @@
 package com.example.cashcollectorbot.service;
 
+import com.example.cashcollectorbot.model.Transaction;
 import com.example.cashcollectorbot.model.User;
+import com.example.cashcollectorbot.repo.TransactionsRepo;
 import com.example.cashcollectorbot.repo.UsersRepo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -20,14 +22,17 @@ import java.util.Optional;
 @Service
 public class MessageHandler {
     private UsersRepo usersRepo;
+    private TransactionsRepo transactionsRepo;
 
     private HashMap<String, Handler> handlers;
 
     public MessageHandler() {}
 
     @Autowired
-    public MessageHandler(UsersRepo usersRepo) {
+    public MessageHandler(UsersRepo usersRepo, TransactionsRepo transactionsRepo) {
         this.usersRepo = usersRepo;
+        this.transactionsRepo = transactionsRepo;
+
         handlers = new HashMap<>();
         handlers.put(BotState.START.command, this::start);
         handlers.put(BotState.AT.command, this::addTransaction);
@@ -56,6 +61,14 @@ public class MessageHandler {
         return sendMessage;
     }
 
+    private List<KeyboardRow> buildStartKeyboard() {
+        KeyboardRow addTransactionRow = new KeyboardRow();
+        addTransactionRow.add(BotState.AT.command);
+        List<KeyboardRow> keyboard = new ArrayList<>();
+        keyboard.add(addTransactionRow);
+        return keyboard;
+    }
+
     private ReplyKeyboardMarkup buildReplyKeyboardMarkup(List<KeyboardRow> keyboard) {
         ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup();
         replyKeyboardMarkup.setKeyboard(keyboard);
@@ -64,7 +77,7 @@ public class MessageHandler {
         return replyKeyboardMarkup;
     }
 
-    private User buildUser(Update update, BotState botState) {
+    private User initializeUser(Update update, BotState botState) {
         User user = new User();
         user.setId(update.getMessage().getFrom().getId());
         user.setUsername(update.getMessage().getFrom().getUserName());
@@ -72,45 +85,99 @@ public class MessageHandler {
         return user;
     }
 
-    private SendMessage start(Update update, String state) {
-        usersRepo.save(buildUser(update, BotState.START));
+    private User findUser(Update update) {
+        Long id = update.getMessage().getFrom().getId();
+        Optional<User> user = usersRepo.findById(id);
+        if(!user.isPresent())
+            System.out.println(String.format("CANNOT FIND USER WITH ID = %d", id));
+        return user.get();
+    }
 
-        KeyboardRow addTransactionRow = new KeyboardRow();
-        addTransactionRow.add(BotState.AT.command);
-        List<KeyboardRow> keyboard = new ArrayList<>();
-        keyboard.add(addTransactionRow);
+    private Transaction findTransaction(Long id) {
+        Optional<Transaction> transaction = transactionsRepo.findById(id);
+        if(!transaction.isPresent())
+            System.out.println(String.format("CANNOT FIND TRANSACTION WITH ID = %d", id));
+        return transaction.get();
+    }
+
+    private SendMessage start(Update update, String state) {
+        usersRepo.save(initializeUser(update, BotState.START));
 
         SendMessage sendMessage = new SendMessage(String.valueOf(update.getMessage().getChatId()), BotState.START.description);
-        sendMessage.setReplyMarkup(buildReplyKeyboardMarkup(keyboard));
+        sendMessage.setReplyMarkup(buildReplyKeyboardMarkup(buildStartKeyboard()));
 
         return sendMessage;
     }
 
     private SendMessage addTransaction(Update update, String state) {
-        usersRepo.save(buildUser(update, BotState.AT_NAME));
+        User user = findUser(update);
+        user.setBotState(BotState.AT_NAME.state);
+
+        Transaction transaction = new Transaction();
+        transaction.setUserId(user.getId());
+        transactionsRepo.save(transaction);
+
+        user.setTransactionId(transaction.getId());
+        usersRepo.save(user);
+
         SendMessage sendMessage = new SendMessage(String.valueOf(update.getMessage().getChatId()), BotState.AT_NAME.description);
         sendMessage.setReplyMarkup(new ReplyKeyboardRemove(true));
         return sendMessage;
     }
 
     private SendMessage getName(Update update, String state) {
+        Message receivedMessage = update.getMessage();
         SendMessage sendMessage = null;
         if(state.equals(BotState.AT_NAME.state)) {
-            usersRepo.save(buildUser(update, BotState.AT_SUM));
+            User user = findUser(update);
+            user.setBotState(BotState.AT_SUM.state);
+            usersRepo.save(user);
+
+            Transaction transaction = findTransaction(user.getTransactionId());
+            transaction.setBorrowerName(receivedMessage.getText());
+            transactionsRepo.save(transaction);
+
             sendMessage = new SendMessage(String.valueOf(update.getMessage().getChatId()), BotState.AT_SUM.description);
         }
         return sendMessage;
     }
 
     private SendMessage getSum(Update update, String state) {
-        usersRepo.save(buildUser(update, BotState.AT_DESCRIPTION));
-        SendMessage sendMessage = new SendMessage(String.valueOf(update.getMessage().getChatId()), BotState.AT_DESCRIPTION.description);
-        return sendMessage;
+
+        try {
+            int sum = Integer.parseInt(update.getMessage().getText());
+            if(sum < 0)
+                throw new NumberFormatException();
+
+            User user = findUser(update);
+            user.setBotState(BotState.AT_DESCRIPTION.state);
+            usersRepo.save(user);
+
+            Transaction transaction = findTransaction(user.getTransactionId());
+            transaction.setSum(sum);
+            transactionsRepo.save(transaction);
+
+            SendMessage sendMessage = new SendMessage(String.valueOf(update.getMessage().getChatId()), BotState.AT_DESCRIPTION.description);
+            return sendMessage;
+
+        } catch(NumberFormatException e) {
+            SendMessage sendMessage = new SendMessage(String.valueOf(update.getMessage().getChatId()), BotState.BAD_SUM.description);
+            return sendMessage;
+        }
+
     }
 
     private SendMessage getDescription(Update update, String state) {
-        usersRepo.save(buildUser(update, BotState.START));
+        User user = findUser(update);
+        user.setBotState(BotState.START.state);
+        usersRepo.save(user);
+
+        Transaction transaction = findTransaction(user.getTransactionId());
+        transaction.setDescription(update.getMessage().getText());
+        transactionsRepo.save(transaction);
+
         SendMessage sendMessage = new SendMessage(String.valueOf(update.getMessage().getChatId()), BotState.START.description);
+        sendMessage.setReplyMarkup(buildReplyKeyboardMarkup(buildStartKeyboard()));
         return sendMessage;
     }
 
