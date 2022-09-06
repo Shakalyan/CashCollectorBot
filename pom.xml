@@ -77,6 +77,13 @@
                             <artifactId>lombok</artifactId>
                         </exclude>
                     </excludes>
+                    <archive>
+                        <manifest>
+                            <addClasspath>true</addClasspath>
+                            <classpathPrefix>lib/</classpathPrefix>
+                            <mainClass>com.example.cashcollectorbot.CashCollectorBotApplication</mainClass>
+                        </manifest>
+                    </archive>
                 </configuration>
             </plugin>
         </plugins>
