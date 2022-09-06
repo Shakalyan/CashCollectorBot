@@ -35,22 +35,24 @@ public class MessageHandler {
 
         handlers = new HashMap<>();
         handlers.put(BotState.START.command, this::start);
+
         handlers.put(BotState.AT.command, this::addTransaction);
         handlers.put(BotState.AT_NAME.command, this::getName);
         handlers.put(BotState.AT_SUM.command, this::getSum);
         handlers.put(BotState.AT_DESCRIPTION.command, this::getDescription);
+
         handlers.put(BotState.ST_ALL.command, this::showAllTransactions);
+
+        handlers.put(BotState.DT.command, this::deleteTransaction);
+        handlers.put(BotState.DT.state, this::getTransactionNumber);
     }
 
     public BotApiMethod<?> handle(Update update) {
         Message receivedMessage = update.getMessage();
         Optional<User> user = usersRepo.findById(receivedMessage.getFrom().getId());
-
         String state = user.isPresent() ? user.get().getBotState() : BotState.NEW_USER.state;
-        System.out.println(state);
 
         SendMessage sendMessage = null;
-
         if(handlers.containsKey(state))
             sendMessage = handlers.get(state).handle(update, state);
         else if(handlers.containsKey(receivedMessage.getText()))
@@ -63,11 +65,18 @@ public class MessageHandler {
     }
 
     private List<KeyboardRow> buildStartKeyboard() {
-        KeyboardRow addTransactionRow = new KeyboardRow();
+        KeyboardRow addTransactionRow = new KeyboardRow(),
+                    showAllTransactionsRow = new KeyboardRow(),
+                    deleteTransaction = new KeyboardRow();
+
         addTransactionRow.add(BotState.AT.command);
-        addTransactionRow.add(BotState.ST_ALL.command);
+        showAllTransactionsRow.add(BotState.ST_ALL.command);
+        deleteTransaction.add(BotState.DT.command);
+
         List<KeyboardRow> keyboard = new ArrayList<>();
         keyboard.add(addTransactionRow);
+        keyboard.add(showAllTransactionsRow);
+        keyboard.add(deleteTransaction);
         return keyboard;
     }
 
@@ -136,7 +145,7 @@ public class MessageHandler {
             usersRepo.save(user);
 
             Transaction transaction = findTransaction(user.getTransactionId());
-            transaction.setBorrowerName(receivedMessage.getText());
+            transaction.setBorrowers(receivedMessage.getText());
             transactionsRepo.save(transaction);
 
             sendMessage = new SendMessage(String.valueOf(update.getMessage().getChatId()), BotState.AT_SUM.description);
@@ -191,12 +200,48 @@ public class MessageHandler {
             Transaction t = transactions.get(i);
             text.append(String.format("%d. Сумма: %d₽\nДолжники: %s\nОписание: \"%s\"", i+1,
                                                                                         t.getSum(),
-                                                                                        t.getBorrowerName(),
+                                                                                        t.getBorrowers(),
                                                                                         t.getDescription() != null ? t.getDescription() : ""));
             text.append("\n\n");
         }
 
-        return new SendMessage(String.valueOf(update.getMessage().getChatId()), text.toString());
+        SendMessage sendMessage = new SendMessage(String.valueOf(update.getMessage().getChatId()), text.toString());
+        sendMessage.setReplyMarkup(buildReplyKeyboardMarkup(buildStartKeyboard()));
+        return sendMessage;
+    }
+
+    private SendMessage deleteTransaction(Update update, String state) {
+        User user = findUser(update);
+        user.setBotState(BotState.DT.state);
+        usersRepo.save(user);
+
+        SendMessage sendMessage = new SendMessage(String.valueOf(update.getMessage().getChatId()), BotState.DT.description);
+        sendMessage.setReplyMarkup(new ReplyKeyboardRemove(true));
+
+        return sendMessage;
+    }
+
+    private SendMessage getTransactionNumber(Update update, String state) {
+        ArrayList<Transaction> transactions = transactionsRepo.findAllByUserId(update.getMessage().getFrom().getId());
+        int number;
+        try {
+            number = Integer.parseInt(update.getMessage().getText());
+            if(number < 1 || number > transactions.size())
+                throw new NumberFormatException();
+
+            transactionsRepo.deleteById(transactions.get(number-1).getId());
+
+            User user = findUser(update);
+            user.setBotState(BotState.START.state);
+            usersRepo.save(user);
+
+            SendMessage sendMessage = new SendMessage(String.valueOf(update.getMessage().getChatId()), BotState.START.description);
+            sendMessage.setReplyMarkup(buildReplyKeyboardMarkup(buildStartKeyboard()));
+            return sendMessage;
+
+        } catch(NumberFormatException e) {
+            return new SendMessage(String.valueOf(update.getMessage().getChatId()), BotState.BAD_TRANSACTION_NUMBER.description);
+        }
     }
 
 }

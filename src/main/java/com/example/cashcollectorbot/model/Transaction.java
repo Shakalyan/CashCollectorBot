@@ -19,8 +19,8 @@ public class Transaction {
     @NotNull
     private Long userId;
 
-    @Column(name="borrower_name")
-    private String borrowerName;
+    @Column(name="borrowers")
+    private String borrowers;
 
     @Column(name="sum")
     private Integer sum;
@@ -30,7 +30,7 @@ public class Transaction {
 
     @Override
     public String toString() {
-        return String.format("#%d %s %d₽\n%s", id, borrowerName, sum, description != null ? description : "");
+        return String.format("#%d %s %d₽\n%s", id, borrowers, sum, description != null ? description : "");
     }
 
 }
